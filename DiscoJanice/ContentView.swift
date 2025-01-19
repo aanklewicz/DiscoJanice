@@ -65,6 +65,11 @@ struct ContentView: View {
                     Label("Settings", systemImage: "gearshape")
                 }
             
+            LogView()
+                .tabItem {
+                    Label("Logs", systemImage: "tree")
+                }
+            
             DebugView(albumData: $albumData, itemsCount: $itemsCount, randomItem: $randomItem, pageResults: $pageResults, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl)
                 .tabItem {
                     Label("Debug", systemImage: "ladybug")
@@ -334,6 +339,15 @@ struct SettingsView: View {
 //            }
         }
         .padding()
+    }
+}
+
+struct LogView: View {
+    var body: some View {
+            VStack {
+                Text("Items: meow")
+                }
+            .padding()
     }
 }
 
