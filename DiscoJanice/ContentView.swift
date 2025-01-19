@@ -275,7 +275,9 @@ struct AlbumView: View {
     }
 
     func fetchAlbumCover() {
-        let searchQuery = "\(artistName) \(albumTitle)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let sanitizedArtistName = artistName.replacingOccurrences(of: "&", with: "and")
+        let sanitizedAlbumTitle = albumTitle.replacingOccurrences(of: "&", with: "and")
+        let searchQuery = "\(sanitizedArtistName) \(sanitizedAlbumTitle)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let urlCoverString = "https://itunes.apple.com/search?term=\(searchQuery)&entity=album"
 
         guard let url = URL(string: urlCoverString) else {
