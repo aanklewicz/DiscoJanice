@@ -91,6 +91,7 @@ struct AlbumView: View {
                 AsyncImage(url: url)
                     .frame(width: 300, height: 300)
                     .padding(.bottom, 20)
+                    .shadow(color: .black, radius: 10, x: 0, y: 0)
             } else {
                 ZStack {
                     Color.gray
@@ -102,19 +103,24 @@ struct AlbumView: View {
                         .foregroundColor(.white)
                 }
                 .padding(.bottom, 20)
+                .shadow(color: .black, radius: 10, x: 0, y: 0)
             }
             
             if !(albumTitle == "Album Title") {
                 Text(albumTitle)
+                    .font(.headline)
             } else {
                 Text("Album Title")
+                    .font(.headline)
             }
             
             if !(artistName == "Artist") {
                 Text(artistName)
+                    .font(.headline)
                     .padding(.bottom, 20)
             } else {
                 Text("Artist Name")
+                    .font(.headline)
                     .padding(.bottom, 20)
             }
             
