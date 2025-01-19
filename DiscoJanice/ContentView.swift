@@ -142,13 +142,13 @@ struct AlbumView: View {
             }
             .padding(.bottom, 20)
             
-            if let albumMusicUrl = albumMusicUrl, let url = URL(string: albumMusicUrl) {
+            if let albumMusicUrl = albumMusicUrl, let url = URL(string: "\(albumMusicUrl)?action=play") {
                 Button(action: {
                     UIApplication.shared.open(url)
                 }) {
                     HStack {
                         Image(systemName: "music.note")
-                        Text("Open in Apple Music")
+                        Text("Play in Apple Music")
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
@@ -159,7 +159,7 @@ struct AlbumView: View {
                 Button(action: {}) {
                     HStack {
                         Image(systemName: "music.note")
-                        Text("Open in Apple Music")
+                        Text("Play in Apple Music")
                     }
                     .padding()
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
