@@ -70,10 +70,10 @@ struct ContentView: View {
                     Label("Logs", systemImage: "tree")
                 }
             
-            DebugView(albumData: $albumData, itemsCount: $itemsCount, randomItem: $randomItem, pageResults: $pageResults, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl)
-                .tabItem {
-                    Label("Debug", systemImage: "ladybug")
-                }
+//            DebugView(albumData: $albumData, itemsCount: $itemsCount, randomItem: $randomItem, pageResults: $pageResults, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl)
+//                .tabItem {
+//                    Label("Debug", systemImage: "ladybug")
+//                }
         }
     }
 }
