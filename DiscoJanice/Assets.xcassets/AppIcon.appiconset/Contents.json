@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "discogs-01-2-light.jpg",
+      "filename" : "Icon-1024.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "discogs-01-2-light 1.jpg",
+      "filename" : "Icon-1024 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,67 +25,67 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "discogs-01-2-light 2.jpg",
+      "filename" : "Icon-1024 2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
     },
     {
-      "filename" : "DiscoJanice32 2.png",
+      "filename" : "Icon-16.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "16x16"
     },
     {
-      "filename" : "DiscoJanice32 1.png",
+      "filename" : "Icon-32.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
     },
     {
-      "filename" : "DiscoJanice32.png",
+      "filename" : "Icon-32 1.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "32x32"
     },
     {
-      "filename" : "DiscoJanice64.png",
+      "filename" : "Icon-64.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "32x32"
     },
     {
-      "filename" : "DiscoJanice256 2.png",
+      "filename" : "Icon-128.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
     },
     {
-      "filename" : "DiscoJanice256 1.png",
+      "filename" : "Icon-256.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
     },
     {
-      "filename" : "DiscoJanice256.png",
+      "filename" : "Icon-256 1.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"
     },
     {
-      "filename" : "DiscoJanice512 1.png",
+      "filename" : "Icon-512.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"
     },
     {
-      "filename" : "DiscoJanice512.png",
+      "filename" : "Icon-512 1.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
     },
     {
-      "filename" : "DiscoJanice 3.png",
+      "filename" : "Icon-1024 3.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"
