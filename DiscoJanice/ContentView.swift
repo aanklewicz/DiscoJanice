@@ -114,18 +114,22 @@ struct AlbumView: View {
             if !(albumTitle == "Album Title") {
                 Text(albumTitle)
                     .font(.headline)
+                    .multilineTextAlignment(.center)
             } else {
                 Text("Album Title")
                     .font(.headline)
+                    .multilineTextAlignment(.center)
             }
             
             if !(artistName == "Artist") {
                 Text(artistName)
                     .font(.headline)
+                    .multilineTextAlignment(.center)
                     .padding(.bottom, 20)
             } else {
                 Text("Artist Name")
                     .font(.headline)
+                    .multilineTextAlignment(.center)
                     .padding(.bottom, 20)
             }
             
