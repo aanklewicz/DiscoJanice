@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "discogs-01-1024.png",
+      "filename" : "discogs-01-2-light.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "discogs-01-1024 1.png",
+      "filename" : "discogs-01-2-light 1.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "discogs-01-1024 2.png",
+      "filename" : "discogs-01-2-light 2.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
