@@ -3,7 +3,7 @@
 It's called *DiscoJanice* because Disco=Discogs and Janice=Rand... as in Yoeman Janice Rand from original Star Trek, and rand being short for random. Get it??? 
 
 ## Need Help?
-If you have a **programming question** about how to use CalendarKit in your application, [Create a new GitHub Issue with the question tag](https://github.com/aanklewicz/DiscoJanice/issues/new?assignees=&labels=question&projects=&template=question.md&title=).
+[Create a new GitHub Issue with the question tag](https://github.com/aanklewicz/DiscoJanice/issues/new?assignees=&labels=question&projects=&template=question.md&title=).
 
 [Create a new Issue from template](https://github.com/aanklewicz/DiscoJanice/issues/new/choose) to report a bug or request a new feature.
 
