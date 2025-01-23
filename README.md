@@ -14,7 +14,7 @@ It's called *DiscoJanice* because Disco=Discogs and Janice=Rand... as in Yoeman 
 ## Requirements
 
 iOS 18 or higher
-Download link from App Store pending.
+[Download from the App Store here](https://apps.apple.com/ca/app/discojanice/id6740820977)
 
 ## Contributing
 
