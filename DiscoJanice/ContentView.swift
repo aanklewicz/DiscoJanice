@@ -41,11 +41,6 @@ extension Speaker: AVSpeechSynthesizerDelegate {
 
 struct ContentView: View {
     @State private var discogsUsername: String = UserDefaults.standard.string(forKey: "DiscogsUsername") ?? ""
-    @State private var albumData: String = "Data pending"
-    @State private var itemsCount: Int = 0
-    @State private var randomItem: Int = 0
-    @State private var pageResults: String = "Data pending"
-    @State private var randomSansHundreds: Int = 0
     @State private var albumTitle: String = "Album Title"
     @State private var artistName: String = "Artist"
     @State private var albumCoverUrl: String? = nil
@@ -54,7 +49,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            AlbumView(pageResults: $pageResults, albumData: $albumData, discogsUsername: discogsUsername, itemsCount: $itemsCount, randomItem: $randomItem, randomSansHundreds: $randomSansHundreds, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl)
+            AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl)
                 .tabItem {
                     Label("Album", systemImage: "music.quarternote.3")
                 }
@@ -64,31 +59,17 @@ struct ContentView: View {
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
-            
-//            LogView()
-//                .tabItem {
-//                    Label("Logs", systemImage: "tree")
-//                }
-            
-            DebugView(albumData: $albumData, itemsCount: $itemsCount, randomItem: $randomItem, pageResults: $pageResults, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl)
-                .tabItem {
-                    Label("Debug", systemImage: "ladybug")
-                }
         }
     }
 }
 
 struct AlbumView: View {
-    @Binding var pageResults: String
-    @Binding var albumData: String
     var discogsUsername: String
-    @Binding var itemsCount: Int
-    @Binding var randomItem: Int
-    @Binding var randomSansHundreds: Int
     @Binding var albumTitle: String
     @Binding var artistName: String
     @Binding var albumCoverUrl: String?
     @Binding var albumMusicUrl: String?
+    @State private var isLoading: Bool = false
 
     var body: some View {
         VStack {
@@ -134,17 +115,26 @@ struct AlbumView: View {
             }
             
             Button(action: {
-                fetchRandomAlbum()
+                guard !isLoading else { return }
+                isLoading = true
+                Task {
+                    await suggestAlbumAsync()
+                }
             }) {
-                HStack {
-                    Image(systemName: "shuffle.circle")
-                    Text("Random Album")
+                HStack(spacing: 8) {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "shuffle.circle")
+                    }
+                    Text(isLoading ? "Loading…" : "Random Album")
                 }
                 .padding()
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
                 .foregroundColor(.white)
             }
             .padding(.bottom, 20)
+            .disabled(isLoading)
             
             if let albumMusicUrl = albumMusicUrl, let url = URL(string: "\(albumMusicUrl)") {
                 Button(action: {
@@ -194,132 +184,35 @@ struct AlbumView: View {
         .padding()
     }
 
-    func fetchRandomAlbum() {
-        guard let url = URL(string: "https://api.discogs.com/users/\(discogsUsername)/collection/folders/0/releases") else {
-            return
-        }
-
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data, error == nil else {
-                return
-            }
-
-            if let jsonString = String(data: data, encoding: .utf8) {
-                DispatchQueue.main.async {
-                    albumData = jsonString
-                }
-            }
-
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                   let pagination = json["pagination"] as? [String: Any],
-                   let items = pagination["items"] as? Int {
-                    DispatchQueue.main.async {
-                        itemsCount = items
-                        randomItem = Int.random(in: 1...items)
-                        randomSansHundreds = randomItem % 100
-                        fetchPageResults()
-                    }
-                }
-            } catch {
-                print("Failed to parse JSON: \(error.localizedDescription)")
-            }
-        }
-        
-        task.resume()
+    @MainActor
+    private func applySuggestion(_ suggestion: AlbumSuggestion) {
+        self.albumTitle = suggestion.title
+        self.artistName = suggestion.artist
+        self.albumCoverUrl = suggestion.coverURL
+        self.albumMusicUrl = suggestion.musicURL
     }
 
-    func fetchPageResults() {
-        // Reset album cover URL and album music URL
-        DispatchQueue.main.async {
-            albumCoverUrl = nil
-            albumMusicUrl = nil
-        }
-
-        let itemsPerPage = 100
-        let page = (randomItem / itemsPerPage) + 1
-        let urlString = "https://api.discogs.com/users/\(discogsUsername)/collection/folders/0/releases?page=\(page)&per_page=\(itemsPerPage)"
-        
-        guard let url = URL(string: urlString) else {
-            print("Invalid URL")
+    private func suggestAlbumAsync() async {
+        let username = discogsUsername
+        guard !username.isEmpty else {
+            await MainActor.run {
+                self.isLoading = false
+            }
             return
         }
-
-        let taskItem = URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data, error == nil else {
-                return
+        do {
+            let suggestion = try await AlbumSuggestionService().suggestRandomAlbum(for: username)
+            await MainActor.run {
+                self.applySuggestion(suggestion)
+                self.isLoading = false
             }
-
-            if let jsonString = String(data: data, encoding: .utf8) {
-                DispatchQueue.main.async {
-                    pageResults = jsonString
-                }
-            }
-
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                   let releases = json["releases"] as? [[String: Any]],
-                   let release = releases[randomSansHundreds]["basic_information"] as? [String: Any],
-                   let title = release["title"] as? String,
-                   let artists = release["artists"] as? [[String: Any]],
-                   let artist = artists.first?["name"] as? String {
-                    DispatchQueue.main.async {
-                        albumTitle = title
-                        artistName = artist.replacingOccurrences(of: " *\\([0-9]*\\)$", with: "", options: .regularExpression)
-                        
-                        // Fetch album cover and music URL after setting title and artist name
-                        fetchAlbumCover()
-                    }
-                }
-            } catch {
-                print("Failed to parse JSON: \(error.localizedDescription)")
+        } catch {
+            await MainActor.run {
+                self.albumCoverUrl = nil
+                self.albumMusicUrl = nil
+                self.isLoading = false
             }
         }
-        
-        taskItem.resume()
-    }
-
-    func fetchAlbumCover() {
-        let sanitizedArtistName = artistName.replacingOccurrences(of: "&", with: "and")
-        let sanitizedAlbumTitle = albumTitle.replacingOccurrences(of: "&", with: "and")
-        let searchQuery = "\(sanitizedArtistName) \(sanitizedAlbumTitle)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlCoverString = "https://itunes.apple.com/search?term=\(searchQuery)&entity=album"
-
-        guard let url = URL(string: urlCoverString) else {
-            return
-        }
-
-        let taskCover = URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data, error == nil else {
-                return
-            }
-            
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                   let results = json["results"] as? [[String: Any]],
-                   let firstResult = results.first,
-                   let artworkUrl = firstResult["artworkUrl100"] as? String,
-                   let musicUrl = firstResult["collectionViewUrl"] as? String {
-                    let artworkUrl300 = artworkUrl.replacingOccurrences(of: "100x100", with: "300x300")
-                    DispatchQueue.main.async {
-                        albumCoverUrl = artworkUrl300
-                        albumMusicUrl = musicUrl
-                    }
-                } else {
-                    DispatchQueue.main.async {
-                        albumCoverUrl = nil
-                        albumMusicUrl = nil
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    albumCoverUrl = nil
-                    albumMusicUrl = nil
-                }
-            }
-        }
-        
-        taskCover.resume()
     }
         
 }
@@ -346,47 +239,6 @@ struct SettingsView: View {
 //            }
         }
         .padding()
-    }
-}
-
-struct LogView: View {
-    var body: some View {
-            VStack {
-                Text("Items: meow")
-                }
-            .padding()
-    }
-}
-
-struct DebugView: View {
-    @Binding var albumData: String
-    @Binding var itemsCount: Int
-    @Binding var randomItem: Int
-    @Binding var pageResults: String
-    @Binding var albumTitle: String
-    @Binding var artistName: String
-    @Binding var albumCoverUrl: String?
-
-    var body: some View {
-            VStack {
-                Text("Items: \(itemsCount)")
-                Text("Random Item: \(randomItem)")
-                Text("Album Title: \(albumTitle)")
-                Text("Artist: \(artistName)")
-                TextField("Album Cover URL", text: Binding(
-                    get: { albumCoverUrl ?? "" },
-                    set: { albumCoverUrl = $0.isEmpty ? nil : $0 }
-                ))
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
-                TextEditor(text: $albumData)
-                    .padding()
-                    .border(Color.gray, width: 1)
-                TextEditor(text: $pageResults)
-                    .padding()
-                    .border(Color.gray, width: 1)
-            }
-            .padding()
     }
 }
 
