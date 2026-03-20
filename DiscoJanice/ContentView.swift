@@ -389,6 +389,17 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        AlbumSuggestionService.saveHistory([])
+                        history = []
+                    }) {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(history.isEmpty)
+                }
+            }
             .onAppear {
                 history = AlbumSuggestionService.loadHistory()
             }
