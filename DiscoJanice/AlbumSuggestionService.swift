@@ -189,6 +189,13 @@ public final class AlbumSuggestionService {
             return cache
         }
 
+        return try await forceRefresh(for: username)
+    }
+
+    /// Always fetches from the API regardless of cache age.
+    public func forceRefresh(for username: String) async throws -> CollectionCache {
+        guard !username.isEmpty else { throw ServiceError.invalidUsername }
+
         let albums = try await fetchAllAlbums(for: username)
         let cache = CollectionCache(username: username, albums: albums, lastUpdated: Date())
         Self.saveCache(cache)

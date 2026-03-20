@@ -346,7 +346,7 @@ struct CollectionView: View {
         errorMessage = nil
         Task {
             do {
-                let result = try await AlbumSuggestionService().refreshCacheIfNeeded(for: discogsUsername)
+                let result = try await AlbumSuggestionService().forceRefresh(for: discogsUsername)
                 await MainActor.run {
                     cache = result
                     isLoading = false
