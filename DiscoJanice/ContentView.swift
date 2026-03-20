@@ -54,7 +54,13 @@ struct ContentView: View {
                     Label("Album", systemImage: "music.quarternote.3")
                 }
                 .disabled(discogsUsername.isEmpty)
-            
+
+            CollectionView(discogsUsername: discogsUsername)
+                .tabItem {
+                    Label("Collection", systemImage: "list.bullet")
+                }
+                .disabled(discogsUsername.isEmpty)
+
             SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
@@ -239,6 +245,86 @@ struct SettingsView: View {
 //            }
         }
         .padding()
+    }
+}
+
+struct CollectionView: View {
+    var discogsUsername: String
+    @State private var cache: CollectionCache?
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationView {
+            VStack {
+                if let cache = cache {
+                    Text("Last updated: \(cache.lastUpdated.formatted(date: .abbreviated, time: .standard))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+
+                    List(cache.albums.indices, id: \.self) { index in
+                        HStack {
+                            Text(cache.albums[index].artist)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text(cache.albums[index].title)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } else if isLoading {
+                    Spacer()
+                    ProgressView("Loading collection...")
+                    Spacer()
+                } else if let errorMessage = errorMessage {
+                    Spacer()
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                    Spacer()
+                } else {
+                    Spacer()
+                    Text("Tap refresh to load your collection.")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            }
+            .navigationTitle("Collection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { loadCollection() }) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(isLoading)
+                }
+            }
+            .onAppear {
+                // Show cached data immediately if available
+                cache = AlbumSuggestionService.loadCache()
+                if cache == nil {
+                    loadCollection()
+                }
+            }
+        }
+    }
+
+    private func loadCollection() {
+        guard !discogsUsername.isEmpty else { return }
+        isLoading = true
+        errorMessage = nil
+        Task {
+            do {
+                let result = try await AlbumSuggestionService().refreshCacheIfNeeded(for: discogsUsername)
+                await MainActor.run {
+                    cache = result
+                    isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    isLoading = false
+                }
+            }
+        }
     }
 }
 
