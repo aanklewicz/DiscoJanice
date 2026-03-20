@@ -12,6 +12,20 @@ public struct CollectionCache: Codable {
     public let lastUpdated: Date
 }
 
+public struct HistoryEntry: Codable, Identifiable {
+    public let id: UUID
+    public let title: String
+    public let artist: String
+    public let selectedAt: Date
+
+    public init(title: String, artist: String, selectedAt: Date = Date()) {
+        self.id = UUID()
+        self.title = title
+        self.artist = artist
+        self.selectedAt = selectedAt
+    }
+}
+
 public struct AlbumSuggestion {
     public let title: String
     public let artist: String
@@ -53,6 +67,8 @@ public final class AlbumSuggestionService {
 
     private static let cacheKey = "CollectionCache"
     private static let cacheMaxAge: TimeInterval = 3600 // 1 hour
+    private static let historyKey = "SelectionHistory"
+    private static let recentExclusionDays: TimeInterval = 3 * 24 * 3600 // 3 days
 
     public init() {}
 
@@ -73,6 +89,31 @@ public final class AlbumSuggestionService {
         guard let cache = Self.loadCache(),
               cache.username == username else { return false }
         return Date().timeIntervalSince(cache.lastUpdated) < Self.cacheMaxAge
+    }
+
+    // MARK: - History
+
+    public static func loadHistory() -> [HistoryEntry] {
+        guard let data = UserDefaults.standard.data(forKey: historyKey) else { return [] }
+        return (try? JSONDecoder().decode([HistoryEntry].self, from: data)) ?? []
+    }
+
+    public static func saveHistory(_ history: [HistoryEntry]) {
+        if let data = try? JSONEncoder().encode(history) {
+            UserDefaults.standard.set(data, forKey: historyKey)
+        }
+    }
+
+    public static func recordSelection(title: String, artist: String) {
+        var history = loadHistory()
+        history.insert(HistoryEntry(title: title, artist: artist), at: 0)
+        saveHistory(history)
+    }
+
+    private func recentlySelectedTitles() -> Set<String> {
+        let cutoff = Date().addingTimeInterval(-Self.recentExclusionDays)
+        let recent = Self.loadHistory().filter { $0.selectedAt > cutoff }
+        return Set(recent.map { "\($0.artist)|\($0.title)" })
     }
 
     // MARK: - Fetch all albums from Discogs
@@ -163,7 +204,11 @@ public final class AlbumSuggestionService {
             throw ServiceError.noItems
         }
 
-        let randomAlbum = cache.albums.randomElement()!
+        let recentKeys = recentlySelectedTitles()
+        let eligible = cache.albums.filter { !recentKeys.contains("\($0.artist)|\($0.title)") }
+        // Fall back to full collection if everything was recently played
+        let pool = eligible.isEmpty ? cache.albums : eligible
+        let randomAlbum = pool.randomElement()!
         let title = randomAlbum.title
         let artist = randomAlbum.artist
 

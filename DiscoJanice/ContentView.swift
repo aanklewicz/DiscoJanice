@@ -61,6 +61,11 @@ struct ContentView: View {
                 }
                 .disabled(discogsUsername.isEmpty)
 
+            HistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock")
+                }
+
             SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
@@ -196,6 +201,7 @@ struct AlbumView: View {
         self.artistName = suggestion.artist
         self.albumCoverUrl = suggestion.coverURL
         self.albumMusicUrl = suggestion.musicURL
+        AlbumSuggestionService.recordSelection(title: suggestion.title, artist: suggestion.artist)
     }
 
     private func suggestAlbumAsync() async {
@@ -350,6 +356,41 @@ struct CollectionView: View {
                     errorMessage = error.localizedDescription
                     isLoading = false
                 }
+            }
+        }
+    }
+}
+
+struct HistoryView: View {
+    @State private var history: [HistoryEntry] = []
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if history.isEmpty {
+                    VStack {
+                        Spacer()
+                        Text("No albums selected yet.")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                } else {
+                    List(history) { entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.artist)
+                                .fontWeight(.semibold)
+                            Text(entry.title)
+                                .foregroundColor(.secondary)
+                            Text(entry.selectedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundColor(.tertiary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("History")
+            .onAppear {
+                history = AlbumSuggestionService.loadHistory()
             }
         }
     }
