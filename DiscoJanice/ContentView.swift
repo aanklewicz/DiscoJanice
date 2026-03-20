@@ -227,6 +227,14 @@ struct SettingsView: View {
     @Binding var discogsUsername: String
     @Binding var isSonosEnabled: Bool
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    }
+
     var body: some View {
         Form {
             Section(header: Text("Discogs Credentials")) {
@@ -237,12 +245,25 @@ struct SettingsView: View {
                         UserDefaults.standard.set(newValue, forKey: "DiscogsUsername")
                     }
             }
-//            Section {
-//                Toggle("Sonos", isOn: $isSonosEnabled)
-//                    .onChange(of: isSonosEnabled, initial: true) { oldValue, newValue in
-//                        UserDefaults.standard.set(newValue, forKey: "SonosEnabled")
-//                    }
-//            }
+
+            Section(header: Text("About")) {
+                HStack {
+                    Text("Version")
+                    Spacer()
+                    Text("\(appVersion) (\(buildNumber))")
+                        .foregroundColor(.secondary)
+                }
+                Link(destination: URL(string: "https://github.com/aanklewicz/DiscoJanice")!) {
+                    HStack {
+                        Text("Support")
+                        Spacer()
+                        Text("GitHub")
+                            .foregroundColor(.secondary)
+                        Image(systemName: "arrow.up.right.square")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
         .padding()
     }
@@ -254,8 +275,14 @@ struct CollectionView: View {
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
 
+    private var sortedAlbums: [CachedAlbum] {
+        (cache?.albums ?? []).sorted {
+            $0.artist.localizedCaseInsensitiveCompare($1.artist) == .orderedAscending
+        }
+    }
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 if let cache = cache {
                     Text("Last updated: \(cache.lastUpdated.formatted(date: .abbreviated, time: .standard))")
@@ -263,12 +290,12 @@ struct CollectionView: View {
                         .foregroundColor(.secondary)
                         .padding(.top, 8)
 
-                    List(cache.albums.indices, id: \.self) { index in
+                    List(sortedAlbums.indices, id: \.self) { index in
                         HStack {
-                            Text(cache.albums[index].artist)
+                            Text(sortedAlbums[index].artist)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Text(cache.albums[index].title)
+                            Text(sortedAlbums[index].title)
                                 .foregroundColor(.secondary)
                         }
                     }
