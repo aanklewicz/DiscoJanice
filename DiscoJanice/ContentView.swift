@@ -383,7 +383,7 @@ struct HistoryView: View {
                                 .foregroundColor(.secondary)
                             Text(entry.selectedAt.formatted(date: .abbreviated, time: .shortened))
                                 .font(.caption)
-                                .foregroundColor(.tertiary)
+                                .foregroundStyle(.tertiary)
                         }
                     }
                 }
