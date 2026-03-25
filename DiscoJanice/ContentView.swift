@@ -265,6 +265,7 @@ struct AlbumView: View {
 struct SettingsView: View {
     @Binding var discogsUsername: String
     @Binding var isSonosEnabled: Bool
+    @State private var exclusionDays: Double = Double(AlbumSuggestionService.exclusionDays)
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -282,6 +283,19 @@ struct SettingsView: View {
                     .disableAutocorrection(true)
                     .onChange(of: discogsUsername, initial: true) { oldValue, newValue in
                         UserDefaults.standard.set(newValue, forKey: "DiscogsUsername")
+                    }
+            }
+
+            Section(header: Text("Random Album"), footer: Text("Albums selected within this many days will be excluded from random picks. Set to 0 to allow repeats.")) {
+                HStack {
+                    Text("No repeat days")
+                    Spacer()
+                    Text("\(Int(exclusionDays))")
+                        .foregroundColor(.secondary)
+                }
+                Slider(value: $exclusionDays, in: 0...365, step: 1)
+                    .onChange(of: exclusionDays) { _, newValue in
+                        AlbumSuggestionService.exclusionDays = Int(newValue)
                     }
             }
 

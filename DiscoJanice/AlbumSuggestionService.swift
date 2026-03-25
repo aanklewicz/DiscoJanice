@@ -68,7 +68,18 @@ public final class AlbumSuggestionService {
     private static let cacheKey = "CollectionCache"
     private static let cacheMaxAge: TimeInterval = 3600 // 1 hour
     private static let historyKey = "SelectionHistory"
-    private static let recentExclusionDays: TimeInterval = 3 * 24 * 3600 // 3 days
+    private static let exclusionDaysKey = "ExclusionDays"
+
+    public static var exclusionDays: Int {
+        get {
+            let stored = UserDefaults.standard.integer(forKey: exclusionDaysKey)
+            // UserDefaults returns 0 for unset keys, so default to 3
+            return UserDefaults.standard.object(forKey: exclusionDaysKey) != nil ? stored : 3
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: exclusionDaysKey)
+        }
+    }
 
     public init() {}
 
@@ -111,7 +122,9 @@ public final class AlbumSuggestionService {
     }
 
     private func recentlySelectedTitles() -> Set<String> {
-        let cutoff = Date().addingTimeInterval(-Self.recentExclusionDays)
+        let days = Self.exclusionDays
+        guard days > 0 else { return [] }
+        let cutoff = Date().addingTimeInterval(-TimeInterval(days) * 24 * 3600)
         let recent = Self.loadHistory().filter { $0.selectedAt > cutoff }
         return Set(recent.map { "\($0.artist)|\($0.title)" })
     }
