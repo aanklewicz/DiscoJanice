@@ -17,6 +17,20 @@ It's called *DiscoJanice* because Disco=Discogs and Janice=Rand... as in Yoeman 
 [Create a new Issue from template](https://github.com/aanklewicz/DiscoJanice/issues/new/choose) to report a bug or request a new feature.
 
 
+## Screenshots
+
+### iOS
+
+| Album | Collection | History |
+|:---:|:---:|:---:|
+| ![Album Tab](screenshots/iOS/AlbumTab.png) | ![Collection Tab](screenshots/iOS/CollectionTab.png) | ![History Tab](screenshots/iOS/HistoryTab.png) |
+
+### macOS
+
+| Album | Collection | History |
+|:---:|:---:|:---:|
+| ![Album Tab](screenshots/macOS/AlbumTab.png) | ![Collection Tab](screenshots/macOS/CollectionTab.png) | ![History Tab](screenshots/macOS/HistoryTab.png) |
+
 ## Examples
 [Video](https://youtube.com/shorts/4Y_LSs58Bqw?si=emdO1CWZDpoB8QFM)
 
