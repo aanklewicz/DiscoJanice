@@ -82,6 +82,10 @@ struct AlbumView: View {
     @Binding var albumMusicUrl: String?
     @State private var isLoading: Bool = false
 
+    private var albumCoverSize: CGFloat {
+        ProcessInfo.processInfo.isiOSAppOnMac ? 450 : 300
+    }
+
     var body: some View {
         ZStack {
             if let albumCoverUrl = albumCoverUrl, let url = URL(string: albumCoverUrl) {
@@ -104,10 +108,10 @@ struct AlbumView: View {
                         image
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 300, height: 300)
+                            .frame(width: albumCoverSize, height: albumCoverSize)
                     } placeholder: {
                         ProgressView()
-                            .frame(width: 300, height: 300)
+                            .frame(width: albumCoverSize, height: albumCoverSize)
                     }
                     .padding(.bottom, 20)
                     .shadow(color: .black, radius: 10, x: 0, y: 0)
@@ -215,11 +219,11 @@ struct AlbumView: View {
     private var albumPlaceholder: some View {
         ZStack {
             Color.gray
-                .frame(width: 300, height: 300)
+                .frame(width: albumCoverSize, height: albumCoverSize)
             Image(systemName: "music.microphone.circle")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 100, height: 100)
+                .frame(width: albumCoverSize / 3, height: albumCoverSize / 3)
                 .foregroundColor(.white)
         }
     }
