@@ -69,15 +69,17 @@ public final class AlbumSuggestionService {
     private static let cacheMaxAge: TimeInterval = 3600 // 1 hour
     private static let historyKey = "SelectionHistory"
     private static let exclusionDaysKey = "ExclusionDays"
+    private static let cloud = NSUbiquitousKeyValueStore.default
 
     public static var exclusionDays: Int {
         get {
             let stored = UserDefaults.standard.integer(forKey: exclusionDaysKey)
-            // UserDefaults returns 0 for unset keys, so default to 3
             return UserDefaults.standard.object(forKey: exclusionDaysKey) != nil ? stored : 3
         }
         set {
             UserDefaults.standard.set(newValue, forKey: exclusionDaysKey)
+            cloud.set(newValue, forKey: exclusionDaysKey)
+            cloud.synchronize()
         }
     }
 
@@ -112,7 +114,24 @@ public final class AlbumSuggestionService {
     public static func saveHistory(_ history: [HistoryEntry]) {
         if let data = try? JSONEncoder().encode(history) {
             UserDefaults.standard.set(data, forKey: historyKey)
+            cloud.set(data, forKey: historyKey)
+            cloud.synchronize()
         }
+    }
+
+    public static func loadCloudHistory() -> [HistoryEntry] {
+        guard let data = cloud.data(forKey: historyKey) else { return [] }
+        return (try? JSONDecoder().decode([HistoryEntry].self, from: data)) ?? []
+    }
+
+    public static func mergeHistory() -> [HistoryEntry] {
+        let local = loadHistory()
+        let remote = loadCloudHistory()
+        let localIDs = Set(local.map { $0.id })
+        let newRemote = remote.filter { !localIDs.contains($0.id) }
+        let merged = (local + newRemote).sorted { $0.selectedAt > $1.selectedAt }
+        saveHistory(merged)
+        return merged
     }
 
     public static func recordSelection(title: String, artist: String) {

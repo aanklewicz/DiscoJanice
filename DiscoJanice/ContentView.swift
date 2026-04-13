@@ -47,6 +47,8 @@ struct ContentView: View {
     @State private var albumMusicUrl: String? = nil
     @State private var isSonosEnabled: Bool = UserDefaults.standard.bool(forKey: "SonosEnabled")
 
+    private let cloud = NSUbiquitousKeyValueStore.default
+
     var body: some View {
         TabView {
             AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl)
@@ -71,6 +73,33 @@ struct ContentView: View {
                     Label("Settings", systemImage: "gearshape")
                 }
         }
+        .onAppear {
+            pullFromCloud()
+            cloud.synchronize()
+            NotificationCenter.default.addObserver(
+                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+                object: cloud,
+                queue: .main
+            ) { _ in
+                pullFromCloud()
+            }
+        }
+    }
+
+    private func pullFromCloud() {
+        if let cloudUsername = cloud.string(forKey: "DiscogsUsername"), !cloudUsername.isEmpty {
+            discogsUsername = cloudUsername
+            UserDefaults.standard.set(cloudUsername, forKey: "DiscogsUsername")
+        }
+        if cloud.object(forKey: "SonosEnabled") != nil {
+            isSonosEnabled = cloud.bool(forKey: "SonosEnabled")
+            UserDefaults.standard.set(isSonosEnabled, forKey: "SonosEnabled")
+        }
+        if cloud.object(forKey: "ExclusionDays") != nil {
+            let days = Int(cloud.longLong(forKey: "ExclusionDays"))
+            AlbumSuggestionService.exclusionDays = days
+        }
+        _ = AlbumSuggestionService.mergeHistory()
     }
 }
 
@@ -267,6 +296,8 @@ struct SettingsView: View {
     @Binding var isSonosEnabled: Bool
     @State private var exclusionDays: Double = Double(AlbumSuggestionService.exclusionDays)
 
+    private let cloud = NSUbiquitousKeyValueStore.default
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
@@ -283,6 +314,8 @@ struct SettingsView: View {
                     .disableAutocorrection(true)
                     .onChange(of: discogsUsername, initial: true) { oldValue, newValue in
                         UserDefaults.standard.set(newValue, forKey: "DiscogsUsername")
+                        cloud.set(newValue, forKey: "DiscogsUsername")
+                        cloud.synchronize()
                     }
             }
 
@@ -328,9 +361,22 @@ struct CollectionView: View {
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
 
+    private static let sortPrefixes = ["the ", "a ", "an ", "los ", "las ", "les ", "le ", "la ", "el ", "die ", "das ", "der "]
+
+    private static func sortableArtist(_ name: String) -> String {
+        let lowered = name.lowercased()
+        for prefix in sortPrefixes {
+            if lowered.hasPrefix(prefix) {
+                return String(name.dropFirst(prefix.count))
+            }
+        }
+        return name
+    }
+
     private var sortedAlbums: [CachedAlbum] {
         (cache?.albums ?? []).sorted {
-            $0.artist.localizedCaseInsensitiveCompare($1.artist) == .orderedAscending
+            Self.sortableArtist($0.artist)
+                .localizedCaseInsensitiveCompare(Self.sortableArtist($1.artist)) == .orderedAscending
         }
     }
 
@@ -368,7 +414,7 @@ struct CollectionView: View {
                     Spacer()
                 }
             }
-            .navigationTitle("Collection")
+            .navigationTitle("Collection — \(sortedAlbums.count) item\(sortedAlbums.count == 1 ? "" : "s")")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { loadCollection() }) {
@@ -448,7 +494,10 @@ struct HistoryView: View {
                 }
             }
             .onAppear {
-                history = AlbumSuggestionService.loadHistory()
+                history = AlbumSuggestionService.mergeHistory()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
+                history = AlbumSuggestionService.mergeHistory()
             }
         }
     }
