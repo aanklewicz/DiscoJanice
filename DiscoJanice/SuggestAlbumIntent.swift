@@ -22,6 +22,7 @@ struct SuggestAlbumIntent: AppIntent {
         }
 
         let album = try await AlbumSuggestionService().suggestRandomAlbum(for: resolvedUsername)
+        AlbumSuggestionService.recordSelection(title: album.title, artist: album.artist)
         let responseString = "How about '\(album.title)' by \(album.artist)?"
         return .result(value: responseString)
     }

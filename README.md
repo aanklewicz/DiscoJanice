@@ -4,12 +4,22 @@ It's called *DiscoJanice* because Disco=Discogs and Janice=Rand... as in Yoeman 
 
 ## Features
 
-- **Random Album** — Pick a random album from your Discogs collection with artwork and an Apple Music link
-- **Smart Selection** — Albums you've picked in the past 3 days are excluded from random picks so you hear something different
-- **Collection** — Browse your full Discogs collection sorted by artist, with a refresh button to sync from the API
+- **Random Album** — Pick a random album from your Discogs collection with artwork, background art, and an Apple Music link
+- **Smart Selection** — Recently picked albums are excluded from random picks so you hear something different. Customize the no-repeat window from 0 to 365 days in Settings
+- **Collection** — Browse your full Discogs collection sorted by artist (ignoring "The", "A", "An", etc.), with an item count and a refresh button to sync from the API
 - **History** — See every album you've selected with artist, title, and timestamp, with the option to clear your history
-- **Siri Shortcut** — Ask Siri to suggest an album via App Intents
+- **Siri Shortcut** — Ask Siri to suggest an album via App Intents, with selections saved to your history
 - **Ask To Play** — Have your device speak a command to Sonos or Siri to play the selected album
+- **iCloud Sync** — Settings and history sync across all your devices via iCloud
+
+## What's New in 2.1
+
+- **Background album art** — The Album tab now displays a blurred version of the cover art as a background
+- **Siri history** — Albums suggested via Siri are now saved to your selection history
+- **Customizable no-repeat days** — Set how many days before an album can be picked again (0–365), replacing the fixed 3-day window
+- **Smarter collection sorting** — Artists are sorted ignoring leading articles (The, A, An, Le, La, Los, Die, etc.)
+- **Collection item count** — The Collection tab title shows the total number of items
+- **iCloud sync** — Your Discogs username, settings, and selection history now sync across all your devices
 
 ## Need Help?
 [Create a new GitHub Issue with the question tag](https://github.com/aanklewicz/DiscoJanice/issues/new?assignees=&labels=question&projects=&template=question.md&title=).
