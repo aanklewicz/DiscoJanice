@@ -409,6 +409,11 @@ struct SettingsView: View {
 struct CollectionView: View {
     var discogsUsername: String
     @State private var cache: CollectionCache?
+    // Sorted once when the collection loads and cached here. Previously this was a
+    // computed property that re-sorted the entire collection on every access — and it
+    // was read twice per row plus in the title, so rendering N albums triggered ~N full
+    // sorts. Storing the result makes the list snappy regardless of collection size.
+    @State private var sortedAlbums: [CachedAlbum] = []
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
 
@@ -424,11 +429,14 @@ struct CollectionView: View {
         return name
     }
 
-    private var sortedAlbums: [CachedAlbum] {
-        (cache?.albums ?? []).sorted {
-            Self.sortableArtist($0.artist)
-                .localizedCaseInsensitiveCompare(Self.sortableArtist($1.artist)) == .orderedAscending
-        }
+    /// Sorts albums by artist, ignoring leading articles. Precomputes each album's sort
+    /// key once (rather than recomputing it inside every comparison) so large
+    /// collections sort in a single O(n log n) pass.
+    private static func sorted(_ albums: [CachedAlbum]) -> [CachedAlbum] {
+        albums
+            .map { (key: sortableArtist($0.artist), album: $0) }
+            .sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+            .map { $0.album }
     }
 
     var body: some View {
@@ -476,8 +484,11 @@ struct CollectionView: View {
             }
             .onAppear {
                 // Show cached data immediately if available
-                cache = AlbumSuggestionService.loadCache()
-                if cache == nil {
+                let loaded = AlbumSuggestionService.loadCache()
+                cache = loaded
+                if let loaded {
+                    sortedAlbums = Self.sorted(loaded.albums)
+                } else {
                     loadCollection()
                 }
             }
@@ -491,8 +502,10 @@ struct CollectionView: View {
         Task {
             do {
                 let result = try await AlbumSuggestionService().forceRefresh(for: discogsUsername)
+                let sorted = Self.sorted(result.albums)
                 await MainActor.run {
                     cache = result
+                    sortedAlbums = sorted
                     isLoading = false
                 }
             } catch {
