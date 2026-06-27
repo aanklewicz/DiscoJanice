@@ -130,7 +130,14 @@ public final class AlbumSuggestionService {
         let localIDs = Set(local.map { $0.id })
         let newRemote = remote.filter { !localIDs.contains($0.id) }
         let merged = (local + newRemote).sorted { $0.selectedAt > $1.selectedAt }
-        saveHistory(merged)
+        // Only persist when the remote actually contributed new entries. mergeHistory
+        // runs on every iCloud change notification; unconditionally calling saveHistory
+        // here wrote back to NSUbiquitousKeyValueStore and called synchronize() every
+        // time, which could re-trigger the change notification and create a write/notify
+        // feedback loop. Local-only selections are already persisted by recordSelection.
+        if !newRemote.isEmpty {
+            saveHistory(merged)
+        }
         return merged
     }
 

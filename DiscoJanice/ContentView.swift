@@ -83,13 +83,18 @@ struct ContentView: View {
         .onAppear {
             pullFromCloud()
             cloud.synchronize()
-            NotificationCenter.default.addObserver(
-                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-                object: cloud,
-                queue: .main
-            ) { _ in
-                pullFromCloud()
-            }
+        }
+        // Use SwiftUI's managed subscription instead of NotificationCenter.addObserver.
+        // The old code registered a new block observer on every .onAppear and never
+        // removed it, so observers accumulated for the lifetime of the process. Over a
+        // long macOS session each iCloud change notification fanned out to every leaked
+        // observer (all on the main queue), eventually saturating the main thread and
+        // freezing the UI. onReceive is tied to the view lifecycle and is not duplicated.
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloud
+        )) { _ in
+            pullFromCloud()
         }
     }
 
