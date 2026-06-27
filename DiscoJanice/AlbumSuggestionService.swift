@@ -290,6 +290,36 @@ public final class AlbumSuggestionService {
         return AlbumSuggestion(title: title, artist: artist, coverURL: artwork300, musicURL: collectionViewUrl)
     }
 
+    // MARK: - Artwork lookup
+
+    /// Looks up Apple Music artwork and album URL for a given album via the iTunes
+    /// Search API, without touching the cache or selection history. Returns nils on
+    /// any failure so callers can still display the album without artwork.
+    public func lookupArtwork(title: String, artist: String) async -> (coverURL: String?, musicURL: String?) {
+        let artistTerm = artist.replacingOccurrences(of: "&", with: "and")
+        let titleTerm = title.replacingOccurrences(of: "&", with: "and")
+        let searchTerm = "\(artistTerm) \(titleTerm)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+
+        guard !searchTerm.isEmpty,
+              let itunesURL = URL(string: "https://itunes.apple.com/search?term=\(searchTerm)&entity=album") else {
+            return (nil, nil)
+        }
+
+        guard
+            let (itunesData, _) = try? await urlSessionData(from: itunesURL),
+            let itunesJson = try? JSONSerialization.jsonObject(with: itunesData, options: []) as? [String: Any],
+            let results = itunesJson["results"] as? [[String: Any]],
+            let firstResult = results.first
+        else {
+            return (nil, nil)
+        }
+
+        let artworkUrl100 = firstResult["artworkUrl100"] as? String
+        let collectionViewUrl = firstResult["collectionViewUrl"] as? String
+        let artwork300 = artworkUrl100?.replacingOccurrences(of: "100x100", with: "300x300")
+        return (artwork300, collectionViewUrl)
+    }
+
     // MARK: - Helpers
 
     private func urlSessionData(from url: URL) async throws -> (Data, URLResponse) {

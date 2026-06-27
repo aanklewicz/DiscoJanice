@@ -47,6 +47,7 @@ struct ContentView: View {
     @State private var albumMusicUrl: String? = nil
     @State private var isSonosEnabled: Bool = ContentView.boolDefaultTrue(forKey: "SonosEnabled")
     @State private var isSiriEnabled: Bool = ContentView.boolDefaultTrue(forKey: "SiriEnabled")
+    @State private var selectedTab: Int = 0
 
     private let cloud = NSUbiquitousKeyValueStore.default
 
@@ -57,28 +58,32 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl, isSonosEnabled: isSonosEnabled, isSiriEnabled: isSiriEnabled)
                 .tabItem {
                     Label("Album", systemImage: "music.quarternote.3")
                 }
                 .disabled(discogsUsername.isEmpty)
+                .tag(0)
 
             CollectionView(discogsUsername: discogsUsername)
                 .tabItem {
                     Label("Collection", systemImage: "list.bullet")
                 }
                 .disabled(discogsUsername.isEmpty)
+                .tag(1)
 
-            HistoryView()
+            HistoryView(albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl, selectedTab: $selectedTab)
                 .tabItem {
                     Label("History", systemImage: "clock")
                 }
+                .tag(2)
 
             SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled, isSiriEnabled: $isSiriEnabled)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
+                .tag(3)
         }
         .onAppear {
             pullFromCloud()
@@ -501,6 +506,11 @@ struct CollectionView: View {
 }
 
 struct HistoryView: View {
+    @Binding var albumTitle: String
+    @Binding var artistName: String
+    @Binding var albumCoverUrl: String?
+    @Binding var albumMusicUrl: String?
+    @Binding var selectedTab: Int
     @State private var history: [HistoryEntry] = []
 
     var body: some View {
@@ -514,16 +524,29 @@ struct HistoryView: View {
                         Spacer()
                     }
                 } else {
-                    List(history) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.artist)
-                                .fontWeight(.semibold)
-                            Text(entry.title)
-                                .foregroundColor(.secondary)
-                            Text(entry.selectedAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                    List {
+                        ForEach(history) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.artist)
+                                    .fontWeight(.semibold)
+                                Text(entry.title)
+                                    .foregroundColor(.secondary)
+                                Text(entry.selectedAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            // Swipe right (leading edge) to load this album on the Album tab.
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    showOnAlbumTab(entry)
+                                } label: {
+                                    Label("Show", systemImage: "play.circle")
+                                }
+                                .tint(.accentColor)
+                            }
                         }
+                        // Swipe left (trailing edge) to delete, via the standard onDelete affordance.
+                        .onDelete(perform: deleteEntries)
                     }
                 }
             }
@@ -544,6 +567,28 @@ struct HistoryView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
                 history = AlbumSuggestionService.mergeHistory()
+            }
+        }
+    }
+
+    private func deleteEntries(at offsets: IndexSet) {
+        history.remove(atOffsets: offsets)
+        AlbumSuggestionService.saveHistory(history)
+    }
+
+    private func showOnAlbumTab(_ entry: HistoryEntry) {
+        // Show the title/artist immediately and switch to the Album tab,
+        // then fetch artwork and the Apple Music link in the background.
+        albumTitle = entry.title
+        artistName = entry.artist
+        albumCoverUrl = nil
+        albumMusicUrl = nil
+        selectedTab = 0
+        Task {
+            let result = await AlbumSuggestionService().lookupArtwork(title: entry.title, artist: entry.artist)
+            await MainActor.run {
+                albumCoverUrl = result.coverURL
+                albumMusicUrl = result.musicURL
             }
         }
     }
