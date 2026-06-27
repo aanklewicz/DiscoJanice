@@ -590,17 +590,21 @@ struct HistoryView: View {
     }
 
     private func showOnAlbumTab(_ entry: HistoryEntry) {
-        // Show the title/artist immediately and switch to the Album tab,
-        // then fetch artwork and the Apple Music link in the background.
+        // Show the title/artist immediately and switch to the Album tab. Use the Discogs
+        // cover from the cached collection right away when we have it, then fetch the
+        // Apple Music link (and iTunes art as a fallback) in the background.
         albumTitle = entry.title
         artistName = entry.artist
-        albumCoverUrl = nil
+        let discogsCover = AlbumSuggestionService.cachedCoverImage(title: entry.title, artist: entry.artist)
+        albumCoverUrl = discogsCover
         albumMusicUrl = nil
         selectedTab = 0
         Task {
             let result = await AlbumSuggestionService().lookupArtwork(title: entry.title, artist: entry.artist)
             await MainActor.run {
-                albumCoverUrl = result.coverURL
+                if discogsCover == nil {
+                    albumCoverUrl = result.coverURL
+                }
                 albumMusicUrl = result.musicURL
             }
         }

@@ -4,6 +4,15 @@ import Foundation
 public struct CachedAlbum: Codable {
     public let title: String
     public let artist: String
+    /// Discogs cover art URL (from basic_information.cover_image). Optional so previously
+    /// cached collections, saved before this field existed, still decode cleanly.
+    public let coverImage: String?
+
+    public init(title: String, artist: String, coverImage: String? = nil) {
+        self.title = title
+        self.artist = artist
+        self.coverImage = coverImage
+    }
 }
 
 public struct CollectionCache: Codable {
@@ -90,6 +99,13 @@ public final class AlbumSuggestionService {
     public static func loadCache() -> CollectionCache? {
         guard let data = UserDefaults.standard.data(forKey: cacheKey) else { return nil }
         return try? JSONDecoder().decode(CollectionCache.self, from: data)
+    }
+
+    /// Returns the Discogs cover art URL for an album in the cached collection,
+    /// matched by artist + title. Used so History can reuse Discogs art instead of
+    /// re-matching against iTunes.
+    public static func cachedCoverImage(title: String, artist: String) -> String? {
+        loadCache()?.albums.first { $0.title == title && $0.artist == artist }?.coverImage
     }
 
     private static func saveCache(_ cache: CollectionCache) {
@@ -216,7 +232,11 @@ public final class AlbumSuggestionService {
             }
             let title = Self.stripTrailingNumberSuffix(from: rawTitle)
             let artist = Self.stripTrailingNumberSuffix(from: rawArtist)
-            return CachedAlbum(title: title, artist: artist)
+            // Discogs provides the cover art URL right here; prefer the full-size
+            // cover_image and fall back to the smaller thumb when it's missing/empty.
+            let coverImage = (basicInfo["cover_image"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (basicInfo["thumb"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return CachedAlbum(title: title, artist: artist, coverImage: coverImage)
         }
     }
 
@@ -258,36 +278,13 @@ public final class AlbumSuggestionService {
         let title = randomAlbum.title
         let artist = randomAlbum.artist
 
-        // Fetch iTunes Search API for artwork and music url
-        let artistTerm = artist.replacingOccurrences(of: "&", with: "and")
-        let titleTerm = title.replacingOccurrences(of: "&", with: "and")
-        let searchTerm = "\(artistTerm) \(titleTerm)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        // Album art comes straight from Discogs — no fuzzy iTunes string matching.
+        // Apple Music links aren't in the Discogs data, so we still query iTunes for the
+        // play link, and use its artwork only as a fallback when Discogs has no cover.
+        let (itunesCover, musicURL) = await lookupArtwork(title: title, artist: artist)
+        let coverURL = randomAlbum.coverImage ?? itunesCover
 
-        guard !searchTerm.isEmpty else {
-            return AlbumSuggestion(title: title, artist: artist, coverURL: nil, musicURL: nil)
-        }
-
-        let itunesURLString = "https://itunes.apple.com/search?term=\(searchTerm)&entity=album"
-        guard let itunesURL = URL(string: itunesURLString) else {
-            return AlbumSuggestion(title: title, artist: artist, coverURL: nil, musicURL: nil)
-        }
-
-        let (itunesData, _) = try await urlSessionData(from: itunesURL)
-
-        guard
-            let itunesJson = try? JSONSerialization.jsonObject(with: itunesData, options: []) as? [String: Any],
-            let results = itunesJson["results"] as? [[String: Any]],
-            let firstResult = results.first
-        else {
-            return AlbumSuggestion(title: title, artist: artist, coverURL: nil, musicURL: nil)
-        }
-
-        let artworkUrl100 = firstResult["artworkUrl100"] as? String
-        let collectionViewUrl = firstResult["collectionViewUrl"] as? String
-
-        let artwork300: String? = artworkUrl100?.replacingOccurrences(of: "100x100", with: "300x300")
-
-        return AlbumSuggestion(title: title, artist: artist, coverURL: artwork300, musicURL: collectionViewUrl)
+        return AlbumSuggestion(title: title, artist: artist, coverURL: coverURL, musicURL: musicURL)
     }
 
     // MARK: - Artwork lookup
