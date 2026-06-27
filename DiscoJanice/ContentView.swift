@@ -45,13 +45,20 @@ struct ContentView: View {
     @State private var artistName: String = "Artist"
     @State private var albumCoverUrl: String? = nil
     @State private var albumMusicUrl: String? = nil
-    @State private var isSonosEnabled: Bool = UserDefaults.standard.bool(forKey: "SonosEnabled")
+    @State private var isSonosEnabled: Bool = ContentView.boolDefaultTrue(forKey: "SonosEnabled")
+    @State private var isSiriEnabled: Bool = ContentView.boolDefaultTrue(forKey: "SiriEnabled")
 
     private let cloud = NSUbiquitousKeyValueStore.default
 
+    /// Reads a Bool from UserDefaults, defaulting to `true` when the key has never been set.
+    /// This keeps both integrations on by default for new and existing users.
+    private static func boolDefaultTrue(forKey key: String) -> Bool {
+        UserDefaults.standard.object(forKey: key) == nil ? true : UserDefaults.standard.bool(forKey: key)
+    }
+
     var body: some View {
         TabView {
-            AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl)
+            AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl, isSonosEnabled: isSonosEnabled, isSiriEnabled: isSiriEnabled)
                 .tabItem {
                     Label("Album", systemImage: "music.quarternote.3")
                 }
@@ -68,7 +75,7 @@ struct ContentView: View {
                     Label("History", systemImage: "clock")
                 }
 
-            SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled)
+            SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled, isSiriEnabled: $isSiriEnabled)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
@@ -95,6 +102,10 @@ struct ContentView: View {
             isSonosEnabled = cloud.bool(forKey: "SonosEnabled")
             UserDefaults.standard.set(isSonosEnabled, forKey: "SonosEnabled")
         }
+        if cloud.object(forKey: "SiriEnabled") != nil {
+            isSiriEnabled = cloud.bool(forKey: "SiriEnabled")
+            UserDefaults.standard.set(isSiriEnabled, forKey: "SiriEnabled")
+        }
         if cloud.object(forKey: "ExclusionDays") != nil {
             let days = Int(cloud.longLong(forKey: "ExclusionDays"))
             AlbumSuggestionService.exclusionDays = days
@@ -109,6 +120,8 @@ struct AlbumView: View {
     @Binding var artistName: String
     @Binding var albumCoverUrl: String?
     @Binding var albumMusicUrl: String?
+    var isSonosEnabled: Bool
+    var isSiriEnabled: Bool
     @State private var isLoading: Bool = false
 
     private var albumCoverSize: CGFloat {
@@ -225,24 +238,36 @@ struct AlbumView: View {
                 }
 
 
-                Menu {
-                    Button("Ask Sonos to play") {
-                        let service = "Sonos"
-                        Speaker.shared.speak("Hey \(service), play the album \(albumTitle) by \(artistName)")
+                if isSonosEnabled && isSiriEnabled {
+                    Menu {
+                        Button("Ask Sonos to play") { askToPlay("Sonos") }
+                        Button("Ask Siri to play") { askToPlay("Siri") }
+                    } label: {
+                        askToPlayLabel("Ask To Play")
                     }
-                    Button("Ask Siri to play") {
-                        let service = "Siri"
-                        Speaker.shared.speak("Hey \(service), play the album \(albumTitle) by \(artistName)")
+                } else if isSonosEnabled {
+                    Button(action: { askToPlay("Sonos") }) {
+                        askToPlayLabel("Ask Sonos to play")
                     }
-                } label: {
-                    Label("Ask To Play", systemImage: "speaker.wave.2.bubble")
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
-                        .foregroundColor(.white)
+                } else if isSiriEnabled {
+                    Button(action: { askToPlay("Siri") }) {
+                        askToPlayLabel("Ask Siri to play")
+                    }
                 }
             }
             .padding()
         }
+    }
+
+    private func askToPlay(_ service: String) {
+        Speaker.shared.speak("Hey \(service), play the album \(albumTitle) by \(artistName)")
+    }
+
+    private func askToPlayLabel(_ title: String) -> some View {
+        Label(title, systemImage: "speaker.wave.2.bubble")
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
+            .foregroundColor(.white)
     }
 
     private var albumPlaceholder: some View {
@@ -294,6 +319,7 @@ struct AlbumView: View {
 struct SettingsView: View {
     @Binding var discogsUsername: String
     @Binding var isSonosEnabled: Bool
+    @Binding var isSiriEnabled: Bool
     @State private var exclusionDays: Double = Double(AlbumSuggestionService.exclusionDays)
 
     private let cloud = NSUbiquitousKeyValueStore.default
@@ -315,6 +341,21 @@ struct SettingsView: View {
                     .onChange(of: discogsUsername, initial: true) { oldValue, newValue in
                         UserDefaults.standard.set(newValue, forKey: "DiscogsUsername")
                         cloud.set(newValue, forKey: "DiscogsUsername")
+                        cloud.synchronize()
+                    }
+            }
+
+            Section(header: Text("Integrations"), footer: Text("Choose which voice assistants appear under the Ask To Play button. If both are off, the button is hidden.")) {
+                Toggle("Sonos", isOn: $isSonosEnabled)
+                    .onChange(of: isSonosEnabled) { _, newValue in
+                        UserDefaults.standard.set(newValue, forKey: "SonosEnabled")
+                        cloud.set(newValue, forKey: "SonosEnabled")
+                        cloud.synchronize()
+                    }
+                Toggle("Siri", isOn: $isSiriEnabled)
+                    .onChange(of: isSiriEnabled) { _, newValue in
+                        UserDefaults.standard.set(newValue, forKey: "SiriEnabled")
+                        cloud.set(newValue, forKey: "SiriEnabled")
                         cloud.synchronize()
                     }
             }
