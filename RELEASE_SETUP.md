@@ -12,49 +12,196 @@ When you run it, it:
 4. Uploads the build to App Store Connect and **submits it for review**.
 
 The marketing version comes from `MARKETING_VERSION` in the project; the build
-number is whatever is committed (`CURRENT_PROJECT_VERSION`). Bump the build number
-before each run — App Store Connect rejects a duplicate build number.
+number is whatever is committed (`CURRENT_PROJECT_VERSION`). **Bump the build number
+before each run** — App Store Connect rejects a duplicate build number.
 
-## One-time setup
+> **Heads-up:** a `workflow_dispatch` workflow only appears in the Actions UI (and is
+> only runnable with `gh workflow run`) once the workflow file exists on the repo's
+> **default branch**. These files are currently on `version-2.2`, so merge them into
+> `main` first. After that you can dispatch it against any branch with `--ref`.
 
-### 1. Add the required GitHub secrets
+---
 
-Go to **Settings → Secrets and variables → Actions → New repository secret** and add
-each of these. (I can't add these for you — they're credentials.)
+## 0. Prerequisites (one time)
 
-| Secret | What it is | How to get it |
-| --- | --- | --- |
-| `APP_STORE_CONNECT_KEY_ID` | API key ID | App Store Connect → Users and Access → Integrations → App Store Connect API → create a key (**App Manager** role). Shown next to the key. |
-| `APP_STORE_CONNECT_ISSUER_ID` | API issuer ID | Same page, shown above the key list. |
-| `APP_STORE_CONNECT_KEY_P8` | The `.p8` key contents, base64-encoded | Download the `.p8` once at creation, then: `base64 -i AuthKey_XXXX.p8 \| pbcopy` |
-| `BUILD_CERTIFICATE_BASE64` | Apple **Distribution** cert + private key as a base64 `.p12` | In Keychain Access, select the "Apple Distribution" cert **and** its private key → Export as `.p12`, then `base64 -i cert.p12 \| pbcopy` |
-| `P12_PASSWORD` | Password you set when exporting the `.p12` | You choose it during export |
-| `KEYCHAIN_PASSWORD` | Any random string | Used only for the throwaway CI keychain |
-| `APPLE_TEAM_ID` | 10-character Developer Team ID | developer.apple.com → Membership details |
+Install and authenticate the GitHub CLI, and point it at this repo so you can omit
+`-R` on every command:
 
-### 2. Prepare the App Store listing
+```bash
+brew install gh                       # if you don't already have it
+gh auth login                         # choose GitHub.com → HTTPS → login in browser
+cd ~/path/to/DiscoJanice              # work from inside the repo, or…
+gh repo set-default aanklewicz/DiscoJanice
+```
 
-Because the workflow manages **no** metadata or screenshots (you do that by hand),
-before running it make sure App Store Connect has a version matching
-`MARKETING_VERSION` (e.g. `2.2`) in the **Prepare for Submission** state with release
-notes filled in. The workflow attaches the build to that version and submits it.
+Confirm you're talking to the right repo:
 
-## Running a release
+```bash
+gh repo view --json nameWithOwner -q .nameWithOwner   # -> aanklewicz/DiscoJanice
+```
 
-1. Bump `CURRENT_PROJECT_VERSION` (build number) if you haven't already.
-2. Make sure the App Store version listing is prepared (step 2 above).
-3. GitHub → **Actions → Release to App Store → Run workflow**.
+Everything below assumes macOS (for `base64`/`security`/Keychain) and that you run the
+`gh` commands from inside the repo (or with `-R aanklewicz/DiscoJanice`).
 
-## Notes & tuning
+---
+
+## 1. Gather the credentials
+
+### 1a. App Store Connect API key (`.p8`)
+
+1. App Store Connect → **Users and Access → Integrations → App Store Connect API**.
+2. Click **+** to generate a key. Give it the **App Manager** role (minimum needed to
+   upload a build and submit for review).
+3. Note two values on that page:
+   - **Key ID** — shown in the key row (e.g. `2X9R4HXF34`).
+   - **Issuer ID** — shown above the table (a UUID, e.g. `57246542-96fe-…`).
+4. **Download** the `.p8` (`AuthKey_<KEYID>.p8`). Apple only lets you download it once —
+   keep it somewhere safe.
+
+### 1b. Apple Distribution certificate (`.p12`)
+
+You almost certainly already have this (you've been signing by hand). Export it with
+the private key:
+
+1. Open **Keychain Access** → **My Certificates**.
+2. Find **Apple Distribution: <Your Name/Org> (TEAMID)**. Expand the disclosure
+   triangle so both the certificate **and** its private key are selected.
+3. Right-click → **Export 2 items…** → save as `distribution.p12`.
+4. Set an export password — this becomes the `P12_PASSWORD` secret.
+
+Confirm the identity is present and grab its Team ID at the same time:
+
+```bash
+# Lists code-signing identities; the Team ID is the 10-char code in parentheses,
+# e.g. "Apple Distribution: Jane Dev (ABCDE12345)"
+security find-identity -p codesigning -v
+
+# Or read it straight off the cert's Organizational Unit (OU):
+security find-certificate -c "Apple Distribution" -p \
+  | openssl x509 -noout -subject
+```
+
+### 1c. Team ID
+
+The 10-character Developer **Team ID** (from the command above, or
+developer.apple.com → **Membership details**).
+
+---
+
+## 2. Add the GitHub secrets
+
+These are credentials, so add them yourself. Both a CLI and a UI path are below.
+
+| Secret | Value |
+| --- | --- |
+| `APP_STORE_CONNECT_KEY_ID` | Key ID from step 1a |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID from step 1a |
+| `APP_STORE_CONNECT_KEY_P8` | Base64 of the `.p8` file from step 1a |
+| `BUILD_CERTIFICATE_BASE64` | Base64 of `distribution.p12` from step 1b |
+| `P12_PASSWORD` | The `.p12` export password from step 1b |
+| `KEYCHAIN_PASSWORD` | Any random string (throwaway CI keychain) |
+| `APPLE_TEAM_ID` | 10-char Team ID from step 1c |
+
+### Option A — `gh` CLI (recommended)
+
+Run these from the repo directory, substituting your real values. The two
+file-backed secrets are piped through `base64`; `gh secret set` reads the value from
+stdin when `--body` is omitted:
+
+```bash
+# Plain string values
+gh secret set APP_STORE_CONNECT_KEY_ID    --body "2X9R4HXF34"
+gh secret set APP_STORE_CONNECT_ISSUER_ID --body "57246542-96fe-1a63-e053-0824d011072a"
+gh secret set APPLE_TEAM_ID               --body "ABCDE12345"
+gh secret set P12_PASSWORD                --body "your-p12-export-password"
+
+# Random keychain password (generated on the spot)
+gh secret set KEYCHAIN_PASSWORD           --body "$(openssl rand -base64 24)"
+
+# File-backed values, base64-encoded into the secret
+base64 -i AuthKey_2X9R4HXF34.p8 | gh secret set APP_STORE_CONNECT_KEY_P8
+base64 -i distribution.p12      | gh secret set BUILD_CERTIFICATE_BASE64
+```
+
+Verify all seven are present:
+
+```bash
+gh secret list
+```
+
+You should see exactly: `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`,
+`APP_STORE_CONNECT_KEY_P8`, `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`,
+`KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`.
+
+### Option B — Web UI
+
+**Settings → Secrets and variables → Actions → New repository secret**, and add each
+row from the table. For the two base64 secrets, generate the value first and copy it to
+the clipboard:
+
+```bash
+base64 -i AuthKey_2X9R4HXF34.p8 | pbcopy   # then paste into APP_STORE_CONNECT_KEY_P8
+base64 -i distribution.p12      | pbcopy   # then paste into BUILD_CERTIFICATE_BASE64
+```
+
+---
+
+## 3. Prepare the App Store listing
+
+The workflow manages **no** metadata or screenshots (you do that by hand), so before
+running it make sure App Store Connect has a version matching `MARKETING_VERSION`
+(e.g. `2.2`) in the **Prepare for Submission** state with release notes filled in. The
+workflow attaches the build to that version and submits it.
+
+---
+
+## 4. Run a release
+
+1. Bump `CURRENT_PROJECT_VERSION` (build number) if you haven't already, and push.
+2. Make sure the App Store version listing is prepared (step 3).
+3. Trigger the workflow:
+
+```bash
+# Dispatch against main (default branch)
+gh workflow run release.yml
+
+# …or dispatch the workflow file as it exists on a specific branch
+gh workflow run release.yml --ref version-2.2
+```
+
+UI equivalent: **Actions → Release to App Store → Run workflow**.
+
+### Watch it run
+
+```bash
+gh run list --workflow=release.yml             # find the run
+gh run watch                                   # live status of the latest run
+gh run view --log                              # full logs of the latest run
+gh run view <run-id> --log-failed              # just the failed step's logs
+```
+
+If a run fails, the workflow also uploads gym logs and `fastlane/report.xml` as a
+`fastlane-logs` artifact:
+
+```bash
+gh run download <run-id> -n fastlane-logs
+```
+
+---
+
+## 5. Notes & tuning
 
 - **Just upload, don't submit:** set `submit_for_review: false` in `fastlane/Fastfile`.
 - **Export compliance:** `Info.plist` already sets `ITSAppUsesNonExemptEncryption = false`,
-  so the submission won't stall on the encryption question. If the app ever adds
-  non-exempt encryption, update that key.
+  so the submission won't stall on the encryption question. Update that key if the app
+  ever adds non-exempt encryption.
 - **IDFA:** the lane declares the app does not use the advertising identifier
   (`add_id_info_uses_idfa: false`). Change this if that stops being true.
-- **Signing:** uses automatic/cloud signing. If you'd rather pin an explicit
-  provisioning profile, switch `build_app` to manual signing and add the profile as a
-  secret.
-- **Runner:** pinned to `macos-15`. Bump to `macos-26` (or `macos-latest`) when you
-  move to an Xcode 26+ toolchain.
+- **Signing:** uses automatic/cloud signing (`-allowProvisioningUpdates`) authenticated
+  by the API key, with the distribution cert imported from `BUILD_CERTIFICATE_BASE64`.
+  To pin an explicit provisioning profile instead, switch `build_app` to manual signing
+  and add the profile as a secret.
+- **Runner:** pinned to `macos-15` (Xcode 16.x). Bump to `macos-26` / `macos-latest`
+  when you move to an Xcode 26+ toolchain.
+- **Rotating a secret later:** re-run the relevant `gh secret set …` command; it
+  overwrites in place.
