@@ -55,7 +55,14 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: bundle exec fastlane release
+        run: |
+          set -euo pipefail
+          # xcodebuild needs the API key as a file on disk for -authenticationKeyPath,
+          # while fastlane's upload step reads the base64 contents from the env var.
+          KEY_PATH="$RUNNER_TEMP/asc_api_key.p8"
+          echo -n "$APP_STORE_CONNECT_KEY_P8" | base64 --decode -o "$KEY_PATH"
+          export APP_STORE_CONNECT_KEY_PATH="$KEY_PATH"
+          bundle exec fastlane release
 
       - name: Upload build logs on failure
         if: failure()

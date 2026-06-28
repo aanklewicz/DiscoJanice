@@ -20,9 +20,20 @@ platform :ios do
     # always matches CURRENT MARKETING_VERSION (we keep the committed build number).
     version = get_version_number(xcodeproj: PROJECT, target: SCHEME)
 
-    # Archive and export an App Store .ipa. Signing is done by Xcode's automatic
-    # signing + cloud-managed profiles (-allowProvisioningUpdates), authenticated with
-    # the same API key; the distribution certificate is imported by the CI workflow.
+    team_id = ENV.fetch("APPLE_TEAM_ID")
+
+    # gym/build_app does not accept an api_key option, so pass the App Store Connect API
+    # auth straight to xcodebuild. This lets -allowProvisioningUpdates create/download the
+    # distribution provisioning profile during both archive and export. The .p8 file path
+    # is written by the CI workflow and provided via APP_STORE_CONNECT_KEY_PATH.
+    asc_auth = [
+      "-authenticationKeyID #{ENV.fetch('APP_STORE_CONNECT_KEY_ID')}",
+      "-authenticationKeyIssuerID #{ENV.fetch('APP_STORE_CONNECT_ISSUER_ID')}",
+      "-authenticationKeyPath #{ENV.fetch('APP_STORE_CONNECT_KEY_PATH')}"
+    ].join(" ")
+
+    # Archive and export an App Store .ipa using Xcode automatic signing + cloud-managed
+    # profiles; the distribution certificate is imported by the CI workflow.
     build_app(
       project: PROJECT,
       scheme: SCHEME,
@@ -31,8 +42,9 @@ platform :ios do
       output_directory: "build",
       output_name: "DiscoJanice.ipa",
       clean: true,
-      api_key: api_key,
-      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{ENV.fetch('APPLE_TEAM_ID')}"
+      export_team_id: team_id,
+      xcargs: "-allowProvisioningUpdates #{asc_auth} DEVELOPMENT_TEAM=#{team_id}",
+      export_xcargs: "-allowProvisioningUpdates #{asc_auth}"
     )
 
     # Upload the binary and submit for review. Metadata and screenshots are managed
