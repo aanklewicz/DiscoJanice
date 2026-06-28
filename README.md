@@ -7,10 +7,18 @@ It's called *DiscoJanice* because Disco=Discogs and Janice=Rand... as in Yoeman 
 - **Random Album** — Pick a random album from your Discogs collection with artwork, background art, and an Apple Music link
 - **Smart Selection** — Recently picked albums are excluded from random picks so you hear something different. Customize the no-repeat window from 0 to 365 days in Settings
 - **Collection** — Browse your full Discogs collection sorted by artist (ignoring "The", "A", "An", etc.), with an item count and a refresh button to sync from the API
-- **History** — See every album you've selected with artist, title, and timestamp, with the option to clear your history
+- **History** — See every album you've selected with artist, title, and timestamp. Swipe an entry left to delete it or right to load it back on the Album tab, or clear the whole history
 - **Siri Shortcut** — Ask Siri to suggest an album via App Intents, with selections saved to your history
-- **Ask To Play** — Have your device speak a command to Sonos or Siri to play the selected album
+- **Ask To Play** — Have your device speak a command to Sonos or Siri to play the selected album, with each integration toggled independently in Settings
 - **iCloud Sync** — Settings and history sync across all your devices via iCloud
+
+## What's New in 2.2
+
+- **Accurate album art** — Cover art now comes straight from your Discogs collection instead of being matched through a music search, so the correct artwork shows up
+- **Siri & Sonos toggles** — Turn each voice integration on or off in Settings; the Ask To Play button adapts automatically (a menu when both are on, a single button when one is on, and hidden when both are off)
+- **Swipe actions in History** — Swipe an entry left to delete it, or right to load that album back on the Album tab
+- **Faster Collection tab** — Large collections load and scroll smoothly
+- **macOS stability fix** — Fixed a freeze that could happen when the app was left open for a long time
 
 ## What's New in 2.1
 

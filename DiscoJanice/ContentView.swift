@@ -45,44 +45,61 @@ struct ContentView: View {
     @State private var artistName: String = "Artist"
     @State private var albumCoverUrl: String? = nil
     @State private var albumMusicUrl: String? = nil
-    @State private var isSonosEnabled: Bool = UserDefaults.standard.bool(forKey: "SonosEnabled")
+    @State private var isSonosEnabled: Bool = ContentView.boolDefaultTrue(forKey: "SonosEnabled")
+    @State private var isSiriEnabled: Bool = ContentView.boolDefaultTrue(forKey: "SiriEnabled")
+    @State private var selectedTab: Int = 0
 
     private let cloud = NSUbiquitousKeyValueStore.default
 
+    /// Reads a Bool from UserDefaults, defaulting to `true` when the key has never been set.
+    /// This keeps both integrations on by default for new and existing users.
+    private static func boolDefaultTrue(forKey key: String) -> Bool {
+        UserDefaults.standard.object(forKey: key) == nil ? true : UserDefaults.standard.bool(forKey: key)
+    }
+
     var body: some View {
-        TabView {
-            AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl)
+        TabView(selection: $selectedTab) {
+            AlbumView(discogsUsername: discogsUsername, albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl, isSonosEnabled: isSonosEnabled, isSiriEnabled: isSiriEnabled)
                 .tabItem {
                     Label("Album", systemImage: "music.quarternote.3")
                 }
                 .disabled(discogsUsername.isEmpty)
+                .tag(0)
 
             CollectionView(discogsUsername: discogsUsername)
                 .tabItem {
                     Label("Collection", systemImage: "list.bullet")
                 }
                 .disabled(discogsUsername.isEmpty)
+                .tag(1)
 
-            HistoryView()
+            HistoryView(albumTitle: $albumTitle, artistName: $artistName, albumCoverUrl: $albumCoverUrl, albumMusicUrl: $albumMusicUrl, selectedTab: $selectedTab)
                 .tabItem {
                     Label("History", systemImage: "clock")
                 }
+                .tag(2)
 
-            SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled)
+            SettingsView(discogsUsername: $discogsUsername, isSonosEnabled: $isSonosEnabled, isSiriEnabled: $isSiriEnabled)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
+                .tag(3)
         }
         .onAppear {
             pullFromCloud()
             cloud.synchronize()
-            NotificationCenter.default.addObserver(
-                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-                object: cloud,
-                queue: .main
-            ) { _ in
-                pullFromCloud()
-            }
+        }
+        // Use SwiftUI's managed subscription instead of NotificationCenter.addObserver.
+        // The old code registered a new block observer on every .onAppear and never
+        // removed it, so observers accumulated for the lifetime of the process. Over a
+        // long macOS session each iCloud change notification fanned out to every leaked
+        // observer (all on the main queue), eventually saturating the main thread and
+        // freezing the UI. onReceive is tied to the view lifecycle and is not duplicated.
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloud
+        )) { _ in
+            pullFromCloud()
         }
     }
 
@@ -94,6 +111,10 @@ struct ContentView: View {
         if cloud.object(forKey: "SonosEnabled") != nil {
             isSonosEnabled = cloud.bool(forKey: "SonosEnabled")
             UserDefaults.standard.set(isSonosEnabled, forKey: "SonosEnabled")
+        }
+        if cloud.object(forKey: "SiriEnabled") != nil {
+            isSiriEnabled = cloud.bool(forKey: "SiriEnabled")
+            UserDefaults.standard.set(isSiriEnabled, forKey: "SiriEnabled")
         }
         if cloud.object(forKey: "ExclusionDays") != nil {
             let days = Int(cloud.longLong(forKey: "ExclusionDays"))
@@ -109,6 +130,8 @@ struct AlbumView: View {
     @Binding var artistName: String
     @Binding var albumCoverUrl: String?
     @Binding var albumMusicUrl: String?
+    var isSonosEnabled: Bool
+    var isSiriEnabled: Bool
     @State private var isLoading: Bool = false
 
     private var albumCoverSize: CGFloat {
@@ -225,24 +248,36 @@ struct AlbumView: View {
                 }
 
 
-                Menu {
-                    Button("Ask Sonos to play") {
-                        let service = "Sonos"
-                        Speaker.shared.speak("Hey \(service), play the album \(albumTitle) by \(artistName)")
+                if isSonosEnabled && isSiriEnabled {
+                    Menu {
+                        Button("Ask Sonos to play") { askToPlay("Sonos") }
+                        Button("Ask Siri to play") { askToPlay("Siri") }
+                    } label: {
+                        askToPlayLabel("Ask To Play")
                     }
-                    Button("Ask Siri to play") {
-                        let service = "Siri"
-                        Speaker.shared.speak("Hey \(service), play the album \(albumTitle) by \(artistName)")
+                } else if isSonosEnabled {
+                    Button(action: { askToPlay("Sonos") }) {
+                        askToPlayLabel("Ask Sonos to play")
                     }
-                } label: {
-                    Label("Ask To Play", systemImage: "speaker.wave.2.bubble")
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
-                        .foregroundColor(.white)
+                } else if isSiriEnabled {
+                    Button(action: { askToPlay("Siri") }) {
+                        askToPlayLabel("Ask Siri to play")
+                    }
                 }
             }
             .padding()
         }
+    }
+
+    private func askToPlay(_ service: String) {
+        Speaker.shared.speak("Hey \(service), play the album \(albumTitle) by \(artistName)")
+    }
+
+    private func askToPlayLabel(_ title: String) -> some View {
+        Label(title, systemImage: "speaker.wave.2.bubble")
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
+            .foregroundColor(.white)
     }
 
     private var albumPlaceholder: some View {
@@ -294,6 +329,7 @@ struct AlbumView: View {
 struct SettingsView: View {
     @Binding var discogsUsername: String
     @Binding var isSonosEnabled: Bool
+    @Binding var isSiriEnabled: Bool
     @State private var exclusionDays: Double = Double(AlbumSuggestionService.exclusionDays)
 
     private let cloud = NSUbiquitousKeyValueStore.default
@@ -315,6 +351,21 @@ struct SettingsView: View {
                     .onChange(of: discogsUsername, initial: true) { oldValue, newValue in
                         UserDefaults.standard.set(newValue, forKey: "DiscogsUsername")
                         cloud.set(newValue, forKey: "DiscogsUsername")
+                        cloud.synchronize()
+                    }
+            }
+
+            Section(header: Text("Integrations"), footer: Text("Choose which voice assistants appear under the Ask To Play button. If both are off, the button is hidden.")) {
+                Toggle("Sonos", isOn: $isSonosEnabled)
+                    .onChange(of: isSonosEnabled) { _, newValue in
+                        UserDefaults.standard.set(newValue, forKey: "SonosEnabled")
+                        cloud.set(newValue, forKey: "SonosEnabled")
+                        cloud.synchronize()
+                    }
+                Toggle("Siri", isOn: $isSiriEnabled)
+                    .onChange(of: isSiriEnabled) { _, newValue in
+                        UserDefaults.standard.set(newValue, forKey: "SiriEnabled")
+                        cloud.set(newValue, forKey: "SiriEnabled")
                         cloud.synchronize()
                     }
             }
@@ -358,6 +409,11 @@ struct SettingsView: View {
 struct CollectionView: View {
     var discogsUsername: String
     @State private var cache: CollectionCache?
+    // Sorted once when the collection loads and cached here. Previously this was a
+    // computed property that re-sorted the entire collection on every access — and it
+    // was read twice per row plus in the title, so rendering N albums triggered ~N full
+    // sorts. Storing the result makes the list snappy regardless of collection size.
+    @State private var sortedAlbums: [CachedAlbum] = []
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
 
@@ -373,11 +429,14 @@ struct CollectionView: View {
         return name
     }
 
-    private var sortedAlbums: [CachedAlbum] {
-        (cache?.albums ?? []).sorted {
-            Self.sortableArtist($0.artist)
-                .localizedCaseInsensitiveCompare(Self.sortableArtist($1.artist)) == .orderedAscending
-        }
+    /// Sorts albums by artist, ignoring leading articles. Precomputes each album's sort
+    /// key once (rather than recomputing it inside every comparison) so large
+    /// collections sort in a single O(n log n) pass.
+    private static func sorted(_ albums: [CachedAlbum]) -> [CachedAlbum] {
+        albums
+            .map { (key: sortableArtist($0.artist), album: $0) }
+            .sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+            .map { $0.album }
     }
 
     var body: some View {
@@ -425,8 +484,11 @@ struct CollectionView: View {
             }
             .onAppear {
                 // Show cached data immediately if available
-                cache = AlbumSuggestionService.loadCache()
-                if cache == nil {
+                let loaded = AlbumSuggestionService.loadCache()
+                cache = loaded
+                if let loaded {
+                    sortedAlbums = Self.sorted(loaded.albums)
+                } else {
                     loadCollection()
                 }
             }
@@ -440,8 +502,10 @@ struct CollectionView: View {
         Task {
             do {
                 let result = try await AlbumSuggestionService().forceRefresh(for: discogsUsername)
+                let sorted = Self.sorted(result.albums)
                 await MainActor.run {
                     cache = result
+                    sortedAlbums = sorted
                     isLoading = false
                 }
             } catch {
@@ -455,6 +519,11 @@ struct CollectionView: View {
 }
 
 struct HistoryView: View {
+    @Binding var albumTitle: String
+    @Binding var artistName: String
+    @Binding var albumCoverUrl: String?
+    @Binding var albumMusicUrl: String?
+    @Binding var selectedTab: Int
     @State private var history: [HistoryEntry] = []
 
     var body: some View {
@@ -468,16 +537,29 @@ struct HistoryView: View {
                         Spacer()
                     }
                 } else {
-                    List(history) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.artist)
-                                .fontWeight(.semibold)
-                            Text(entry.title)
-                                .foregroundColor(.secondary)
-                            Text(entry.selectedAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                    List {
+                        ForEach(history) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.artist)
+                                    .fontWeight(.semibold)
+                                Text(entry.title)
+                                    .foregroundColor(.secondary)
+                                Text(entry.selectedAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            // Swipe right (leading edge) to load this album on the Album tab.
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    showOnAlbumTab(entry)
+                                } label: {
+                                    Label("Show", systemImage: "play.circle")
+                                }
+                                .tint(.accentColor)
+                            }
                         }
+                        // Swipe left (trailing edge) to delete, via the standard onDelete affordance.
+                        .onDelete(perform: deleteEntries)
                     }
                 }
             }
@@ -498,6 +580,32 @@ struct HistoryView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
                 history = AlbumSuggestionService.mergeHistory()
+            }
+        }
+    }
+
+    private func deleteEntries(at offsets: IndexSet) {
+        history.remove(atOffsets: offsets)
+        AlbumSuggestionService.saveHistory(history)
+    }
+
+    private func showOnAlbumTab(_ entry: HistoryEntry) {
+        // Show the title/artist immediately and switch to the Album tab. Use the Discogs
+        // cover from the cached collection right away when we have it, then fetch the
+        // Apple Music link (and iTunes art as a fallback) in the background.
+        albumTitle = entry.title
+        artistName = entry.artist
+        let discogsCover = AlbumSuggestionService.cachedCoverImage(title: entry.title, artist: entry.artist)
+        albumCoverUrl = discogsCover
+        albumMusicUrl = nil
+        selectedTab = 0
+        Task {
+            let result = await AlbumSuggestionService().lookupArtwork(title: entry.title, artist: entry.artist)
+            await MainActor.run {
+                if discogsCover == nil {
+                    albumCoverUrl = result.coverURL
+                }
+                albumMusicUrl = result.musicURL
             }
         }
     }

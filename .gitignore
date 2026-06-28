@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Xcode user state / build artifacts
+xcuserdata/
+build/
+DerivedData/
+*.xcuserstate
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# Signing material — never commit these
+*.ipa
+*.p8
+*.p12
+*.mobileprovision
+*.cer

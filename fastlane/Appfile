@@ -1,0 +1,5 @@
+app_identifier("com.neveradtofight.DiscoJanice")
+
+# Authentication in CI is handled by the App Store Connect API key (see Fastfile),
+# so no apple_id / team_id is required here. The Developer Portal Team ID used for
+# signing is supplied at build time via the APPLE_TEAM_ID secret.
