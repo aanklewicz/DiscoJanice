@@ -8,8 +8,10 @@ When you run it, it:
 1. Spins up a macOS runner and selects the latest stable Xcode.
 2. Imports your Apple **distribution certificate** into a temporary keychain.
 3. Archives the `DiscoJanice` scheme (Release) and exports an App Store `.ipa`,
-   signing via Xcode automatic signing + cloud-managed profiles.
-4. Uploads the build to App Store Connect and **submits it for review**.
+   signing manually with your distribution certificate and an App Store profile it
+   downloads via the API key.
+4. Uploads the build to App Store Connect. **It does not submit for review** — you do
+   that by hand (see "After the workflow runs" below).
 
 The marketing version comes from `MARKETING_VERSION` in the project; the build
 number is whatever is committed (`CURRENT_PROJECT_VERSION`). **Bump the build number
@@ -162,18 +164,17 @@ base64 -i distribution.p12      | pbcopy   # then paste into BUILD_CERTIFICATE_B
 
 ## 3. Prepare the App Store listing
 
-The workflow manages **no** metadata or screenshots (you do that by hand), so before
-running it make sure App Store Connect has a version matching `MARKETING_VERSION`
-(e.g. `2.2`) in the **Prepare for Submission** state with release notes filled in. The
-workflow attaches the build to that version and submits it.
+The workflow manages **no** metadata or screenshots — you do that by hand. Before (or
+after) running it, create a version matching `MARKETING_VERSION` (e.g. `2.2`) in App
+Store Connect. You'll fill in the **What's New** release notes there as part of the
+manual submit step below; Apple requires them, which is why the workflow does not submit.
 
 ---
 
 ## 4. Run a release
 
 1. Bump `CURRENT_PROJECT_VERSION` (build number) if you haven't already, and push.
-2. Make sure the App Store version listing is prepared (step 3).
-3. Trigger the workflow:
+2. Trigger the workflow:
 
 ```bash
 # Dispatch against main (default branch)
@@ -184,6 +185,20 @@ gh workflow run release.yml --ref version-2.2
 ```
 
 UI equivalent: **Actions → Release to App Store → Run workflow**.
+
+---
+
+## After the workflow runs (manual submit)
+
+The workflow uploads the build but intentionally does **not** submit it. Once the run
+succeeds:
+
+1. Wait for the build to finish **processing** in App Store Connect (a few minutes;
+   you'll get an email, or watch **TestFlight / Builds**).
+2. Open the **App Store** tab → your `2.2` version.
+3. Attach the processed build under **Build**.
+4. Fill in **What's New in This Version** (release notes) and anything else.
+5. Click **Add for Review** → **Submit**.
 
 ### Watch it run
 
@@ -205,16 +220,17 @@ gh run download <run-id> -n fastlane-logs
 
 ## 5. Notes & tuning
 
-- **Just upload, don't submit:** set `submit_for_review: false` in `fastlane/Fastfile`.
+- **Auto-submit instead of manual:** the lane uploads only (`submit_for_review: false`).
+  To submit automatically you'd set it to `true` *and* supply the "What's New" notes
+  (e.g. add `fastlane/metadata/<locale>/release_notes.txt` and drop `skip_metadata`),
+  since Apple requires release notes to submit.
 - **Export compliance:** `Info.plist` already sets `ITSAppUsesNonExemptEncryption = false`,
-  so the submission won't stall on the encryption question. Update that key if the app
-  ever adds non-exempt encryption.
-- **IDFA:** the lane declares the app does not use the advertising identifier
-  (`add_id_info_uses_idfa: false`). Change this if that stops being true.
-- **Signing:** uses automatic/cloud signing (`-allowProvisioningUpdates`) authenticated
-  by the API key, with the distribution cert imported from `BUILD_CERTIFICATE_BASE64`.
-  To pin an explicit provisioning profile instead, switch `build_app` to manual signing
-  and add the profile as a secret.
+  so review won't stall on the encryption question. Update that key if the app ever adds
+  non-exempt encryption.
+- **Signing:** manual distribution signing — `get_provisioning_profile` downloads an App
+  Store profile via the API key, and `build_app` signs with the `Apple Distribution`
+  certificate imported from `BUILD_CERTIFICATE_BASE64`. The App ID needs its iCloud
+  key-value storage capability enabled so the profile matches the app's entitlement.
 - **Runner:** pinned to `macos-15` (Xcode 16.x). Bump to `macos-26` / `macos-latest`
   when you move to an Xcode 26+ toolchain.
 - **Rotating a secret later:** re-run the relevant `gh secret set …` command; it

@@ -58,23 +58,15 @@ platform :ios do
       }
     )
 
-    # Upload the binary and submit for review. Metadata and screenshots are managed
-    # by hand in App Store Connect, so they are skipped here — make sure the version
-    # listing (release notes, etc.) is prepared before running this lane.
+    # Upload the binary only. Metadata, screenshots, and the "What's New" notes are
+    # managed by hand in App Store Connect — once the build finishes processing there,
+    # attach it to the version, fill in the release notes, and tap "Add for Review".
     upload_to_app_store(
       api_key: api_key,
       app_version: version,
       skip_screenshots: true,
       skip_metadata: true,
-      skip_binary_upload: false,
-      submit_for_review: true,
-      automatic_release: false,
-      force: true,
-      run_precheck_before_submit: false,
-      precheck_include_in_app_purchases: false,
-      submission_information: {
-        add_id_info_uses_idfa: false
-      }
+      submit_for_review: false
     )
   end
 end
