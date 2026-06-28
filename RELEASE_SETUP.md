@@ -60,11 +60,25 @@ Everything below assumes macOS (for `base64`/`security`/Keychain) and that you r
 
 ### 1b. Apple Distribution certificate (`.p12`)
 
-You almost certainly already have this (you've been signing by hand). Export it with
-the private key:
+This is the certificate that authorizes **App Store** uploads. It is **not** the same as
+the certs you may already have in Keychain Access:
+
+- **Apple Development: …** — only for building/running on devices. Not for the App Store.
+- **Developer ID Application / Installer: …** — for distributing Mac apps *outside* the
+  App Store (direct download + notarization). Not for the App Store.
+
+If **My Certificates** has no **Apple Distribution: …** row, create one first (takes a
+few seconds and doesn't affect your existing certs):
+
+1. Xcode → **Settings** (⌘,) → **Accounts**.
+2. Select your Apple ID, select your team, then **Manage Certificates…**.
+3. Click **+** (bottom-left) → **Apple Distribution**. The certificate and its private
+   key are added to your login keychain.
+
+Then export it with the private key:
 
 1. Open **Keychain Access** → **My Certificates**.
-2. Find **Apple Distribution: <Your Name/Org> (TEAMID)**. Expand the disclosure
+2. Find **Apple Distribution: Adam Anklewicz (TEAMID)**. Expand the disclosure
    triangle so both the certificate **and** its private key are selected.
 3. Right-click → **Export 2 items…** → save as `distribution.p12`.
 4. Set an export password — this becomes the `P12_PASSWORD` secret.
