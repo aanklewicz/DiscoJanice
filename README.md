@@ -41,13 +41,13 @@ It's called *DiscoJanice* because Disco=Discogs and Janice=Rand... as in Yoeman 
 
 | Album | Collection | History |
 |:---:|:---:|:---:|
-| ![Album Tab](screenshots/iOS/AlbumTab.png) | ![Collection Tab](screenshots/iOS/CollectionTab.png) | ![History Tab](screenshots/iOS/HistoryTab.png) |
+| ![Album Tab](screenshots/iOS/v2.2/AlbumTab.png) | ![Collection Tab](screenshots/iOS/v2.2/CollectionTab.png) | ![History Tab](screenshots/iOS/v2.2/HistoryTab.png) |
 
 ### macOS
 
 | Album | Collection | History |
 |:---:|:---:|:---:|
-| ![Album Tab](screenshots/macOS/AlbumTab.png) | ![Collection Tab](screenshots/macOS/CollectionTab.png) | ![History Tab](screenshots/macOS/HistoryTab.png) |
+| ![Album Tab](screenshots/macOS/v2.2/AlbumTab.png) | ![Collection Tab](screenshots/macOS/v2.2/CollectionTab.png) | ![History Tab](screenshots/macOS/v2.2/HistoryTab.png) |
 
 ## Examples
 [Video](https://youtube.com/shorts/4Y_LSs58Bqw?si=emdO1CWZDpoB8QFM)
